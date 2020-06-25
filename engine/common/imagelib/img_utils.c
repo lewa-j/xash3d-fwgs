@@ -1307,6 +1307,7 @@ rgbdata_t *Image_DecompressInternal( rgbdata_t *pic )
 	pic->type = PF_RGBA_32;
 
 	pic->buffer = Mem_Realloc( host.imagepool, pic->buffer, image.size );
+	pic->size = image.size;
 	memcpy( pic->buffer, image.tempbuffer, image.size );
 	if( pic->palette ) Mem_Free( pic->palette );
 	pic->flags = image.flags;

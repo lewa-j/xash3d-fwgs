@@ -27,6 +27,7 @@ GNU General Public License for more details.
 #include "studio.h"
 #include "r_efx.h"
 #include "com_image.h"
+#include "vk_local.h"
 
 #define REF_API_VERSION 1
 
@@ -155,6 +156,7 @@ enum ref_graphic_apis_e
 	REF_SOFTWARE,	// hypothetical: just make a surface to draw on, in software
 	REF_GL,		// create GL context
 	REF_D3D,	// Direct3D
+	REF_VULKAN
 };
 
 typedef enum
@@ -391,6 +393,11 @@ typedef struct ref_api_s
 	qboolean (*SW_CreateBuffer)( int width, int height, uint *stride, uint *bpp, uint *r, uint *g, uint *b );
 	void *(*SW_LockBuffer)( void );
 	void (*SW_UnlockBuffer)( void );
+
+	// Vulkan API
+	void *(*VK_GetInstanceProcAddr)( VkInstance instance, const char *name );
+	qboolean (*VK_GetInstanceExtensions)( uint *count, const char **names);
+	qboolean (*VK_CreateSurface)( VkInstance instance, VkSurfaceKHR *surface);
 
 	// gamma
 	void (*BuildGammaTable)( float lightgamma, float brightness );

@@ -20,6 +20,7 @@ GNU General Public License for more details.
 #include "common.h"
 #include "system.h"
 #include "defaults.h"
+#include "vk_local.h"
 
 /*
 ==============================================================================
@@ -123,6 +124,9 @@ void GL_SwapBuffers( void );
 void *SW_LockBuffer( void );
 void SW_UnlockBuffer( void );
 qboolean SW_CreateBuffer( int width, int height, uint *stride, uint *bpp, uint *r, uint *g, uint *b );
+void *VK_GetInstanceProcAddr( VkInstance instance, const char *name );
+qboolean VK_GetInstanceExtensions( uint *count, const char **names);
+qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface);
 
 
 //

@@ -390,7 +390,7 @@ static void UI_UpdateUserinfo( void )
 	player->bottomcolor = Q_atoi( Info_ValueForKey( player->userinfo, "bottomcolor" ));
 	host.userinfo_changed = false; // we got it
 }
-	
+
 void Host_Credits( void )
 {
 	if( !gameui.hInstance ) return;

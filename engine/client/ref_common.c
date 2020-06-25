@@ -346,6 +346,10 @@ static ref_api_t gEngfuncs =
 	SW_LockBuffer,
 	SW_UnlockBuffer,
 
+	VK_GetInstanceProcAddr,
+	VK_GetInstanceExtensions,
+	VK_CreateSurface,
+
 	BuildGammaTable,
 	LightToTexGamma,
 	R_DoResetGamma,

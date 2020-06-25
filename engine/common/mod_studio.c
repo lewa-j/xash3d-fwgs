@@ -308,7 +308,7 @@ StudioCalcBoneAdj
 static void Mod_StudioCalcBoneAdj( float *adj, const byte *pcontroller )
 {
 	int			i, j;
-	float			value;
+	float			value = 0;
 	mstudiobonecontroller_t	*pbonecontroller;
 	
 	pbonecontroller = (mstudiobonecontroller_t *)((byte *)mod_studiohdr + mod_studiohdr->bonecontrollerindex);

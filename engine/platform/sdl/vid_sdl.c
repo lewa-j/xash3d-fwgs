@@ -14,6 +14,7 @@ GNU General Public License for more details.
 */
 #if !XASH_DEDICATED
 #include <SDL.h>
+#include <SDL_vulkan.h>
 #include "common.h"
 #include "client.h"
 #include "mod_local.h"
@@ -239,6 +240,31 @@ void SW_UnlockBuffer( void )
 #endif
 }
 
+PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+
+void *VK_GetInstanceProcAddr( VkInstance instance, const char *name )
+{
+	void *func = vkGetInstanceProcAddr( instance, name );
+
+	if( !func )
+	{
+		Con_Reportf( S_ERROR  "Error: VK_GetInstanceProcAddr failed for %s\n", name );
+	}
+
+	return func;
+}
+
+qboolean VK_GetInstanceExtensions( uint *count, const char **names)
+{
+	return SDL_Vulkan_GetInstanceExtensions( host.hWnd, count, names );
+
+}
+
+qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface)
+{
+	return SDL_Vulkan_CreateSurface( host.hWnd, instance, surface );
+}
+
 int R_MaxVideoModes( void )
 {
 	return num_vidmodes;
@@ -441,6 +467,9 @@ GL_UpdateSwapInterval
 void GL_UpdateSwapInterval( void )
 {
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
+	if( glw_state.vulkan )
+		return;
+
 	// disable VSync while level is loading
 	if( cls.state < ca_active )
 	{
@@ -484,6 +513,9 @@ GL_CreateContext
 qboolean GL_CreateContext( void )
 {
 #if SDL_VERSION_ATLEAST(2, 0, 0)
+	if( glw_state.vulkan )
+		return true;
+
 	if( ( glw_state.context = SDL_GL_CreateContext( host.hWnd ) ) == NULL)
 	{
 		Con_Reportf( S_ERROR "GL_CreateContext: %s\n", SDL_GetError());
@@ -501,6 +533,9 @@ GL_UpdateContext
 qboolean GL_UpdateContext( void )
 {
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
+	if( glw_state.vulkan )
+		return true;
+
 	if( SDL_GL_MakeCurrent( host.hWnd, glw_state.context ))
 	{
 		Con_Reportf( S_ERROR "GL_UpdateContext: %s\n", SDL_GetError());
@@ -516,7 +551,9 @@ void VID_SaveWindowSize( int width, int height )
 	uint rotate = vid_rotate->value;
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
-	if( !glw_state.software )
+	if( glw_state.vulkan )
+		SDL_Vulkan_GetDrawableSize( host.hWnd, &render_w, &render_h );
+	else if( !glw_state.software )
 		SDL_GL_GetDrawableSize( host.hWnd, &render_w, &render_h );
 	else
 		SDL_RenderSetLogicalSize( sw.renderer, width, height );
@@ -622,7 +659,7 @@ qboolean VID_CreateWindow( int width, int height, qboolean fullscreen )
 {
 	static string	wndname;
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
-	Uint32 wndFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_MOUSE_FOCUS;
+	Uint32 wndFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_MOUSE_FOCUS;
 	rgbdata_t *icon = NULL;
 	qboolean iconLoaded = false;
 	char iconpath[MAX_STRING];
@@ -630,8 +667,11 @@ qboolean VID_CreateWindow( int width, int height, qboolean fullscreen )
 
 	if( vid_highdpi->value ) wndFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
 	Q_strncpy( wndname, GI->title, sizeof( wndname ));
-	if( glw_state.software )
-		wndFlags &= ~SDL_WINDOW_OPENGL;
+	if( glw_state.vulkan )
+		wndFlags |=  SDL_WINDOW_VULKAN;
+	else if( !glw_state.software )
+		wndFlags |= SDL_WINDOW_OPENGL;
+
 
 	if( !fullscreen )
 	{
@@ -769,8 +809,7 @@ qboolean VID_CreateWindow( int width, int height, qboolean fullscreen )
 		}
 
 		if( !GL_UpdateContext( ))
-		return false;
-
+			return false;
 	}
 
 #else // SDL_VERSION_ATLEAST( 2, 0, 0 )
@@ -864,6 +903,8 @@ static void GL_SetupAttributes( void )
 
 void GL_SwapBuffers( void )
 {
+	if( glw_state.vulkan )
+		return;
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
 	SDL_GL_SwapWindow( host.hWnd );
 #else // SDL_VERSION_ATLEAST( 2, 0, 0 )
@@ -1004,6 +1045,15 @@ qboolean R_Init_Video( const int type )
 			return false;
 		}
 		break;
+	case REF_VULKAN:
+		if( SDL_Vulkan_LoadLibrary( NULL ) )
+		{
+			Con_Reportf( S_ERROR  "Couldn't initialize Vulkan: %s\n", SDL_GetError());
+			return false;
+		}
+		glw_state.vulkan = true;
+		vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr();
+		break;
 	default:
 		Host_Error( "Can't initialize unknown context type %d!\n", type );
 		break;
@@ -1018,6 +1068,9 @@ qboolean R_Init_Video( const int type )
 	{
 	case REF_GL:
 		// refdll also can check extensions
+		ref.dllFuncs.GL_InitExtensions();
+		break;
+	case REF_VULKAN:
 		ref.dllFuncs.GL_InitExtensions();
 		break;
 	case REF_SOFTWARE:
@@ -1169,6 +1222,9 @@ void R_Free_Video( void )
 	ref.dllFuncs.GL_ClearExtensions();
 
 #if SDL_VERSION_ATLEAST( 2, 0, 0 )
+	if(glw_state.vulkan)
+		SDL_Vulkan_UnloadLibrary();
+
 	SDL_VideoQuit();
 #endif
 }

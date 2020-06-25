@@ -100,7 +100,9 @@ GNU General Public License for more details.
 #else // WIN32
 	#define PATH_SPLITTER "\\"
 	#ifdef __MINGW32__
+		#undef _inline
 		#define _inline static inline
+		#undef FORCEINLINE
 		#define FORCEINLINE inline __attribute__((always_inline))
 	#else
 		#define FORCEINLINE __forceinline
