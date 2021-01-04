@@ -1,0 +1,42 @@
+#! /usr/bin/env python
+# encoding: utf-8
+# lewa_j, 2020
+
+top = '.'
+
+def options(opt):
+	grp = opt.add_option_group('ref_vk options')
+	
+	return
+
+def configure(conf):
+	# check for dedicated server build
+	if conf.options.DEDICATED:
+		return
+		
+	conf.define('REF_DLL', 1)
+
+def build(bld):
+	libs = [ 'public', 'M' ]
+
+	source = bld.path.ant_glob(['*.c'])
+
+	includes = ['.',
+		'../engine',
+		'../engine/common',
+		'../engine/server',
+		'../engine/client',
+		'../public',
+		'../common',
+		'../pm_shared' ]
+		
+	bld.shlib(
+		source   = source,
+		target   = 'ref_vk',
+		features = 'c',
+		includes = includes,
+		use      = libs,
+		defines  = [],
+		install_path = bld.env.LIBDIR,
+		subsystem = bld.env.MSVC_SUBSYSTEM
+	)
