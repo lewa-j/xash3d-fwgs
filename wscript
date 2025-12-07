@@ -93,6 +93,7 @@ SUBDIRS = [
 	Subproject('3rdparty/gl4es',        lambda x: x.env.CLIENT and x.env.GL4ES),
 	Subproject('ref/gl',                lambda x: x.env.CLIENT and (x.env.GL or x.env.NANOGL or x.env.GLWES or x.env.GL4ES or x.env.GLES3COMPAT)),
 	Subproject('ref/soft',              lambda x: x.env.CLIENT and x.env.SOFT),
+	Subproject('ref/dx2',               lambda x: x.env.CLIENT and x.env.DX2),
 	Subproject('ref/null',              lambda x: x.env.CLIENT and x.env.NULL),
 	Subproject('3rdparty/bzip2',        lambda x: x.env.CLIENT and not x.env.HAVE_SYSTEM_BZ2),
 	Subproject('3rdparty/opus',         lambda x: x.env.CLIENT and not x.env.HAVE_SYSTEM_OPUS),
@@ -125,6 +126,7 @@ REFDLLS = [
 	RefDll('gl4es', False),
 	RefDll('gles3compat', False, 'GLES3COMPAT'),
 	RefDll('null', False),
+	RefDll('dx2', False),
 ]
 
 def options(opt):
@@ -472,7 +474,7 @@ def configure(conf):
 		# Don't check them more than once, to save time
 		# Usually, they are always available
 		# but we need them in uselib
-		a = [ 'user32', 'shell32', 'gdi32', 'advapi32', 'dbghelp', 'psapi', 'ws2_32' ]
+		a = [ 'user32', 'shell32', 'gdi32', 'advapi32', 'dbghelp', 'psapi', 'ws2_32', 'ddraw' ]
 		if conf.env.COMPILER_CC == 'msvc':
 			for i in a:
 				conf.start_msg('Checking for MSVC library')
