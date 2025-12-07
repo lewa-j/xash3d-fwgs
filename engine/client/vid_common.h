@@ -22,7 +22,7 @@ typedef struct
 	void     *context; // handle to GL rendering context
 	int      safe;
 	int      desktopBitsPixel;
-	qboolean software;
+	int		type;	// ref_graphic_apis_e
 } glwstate_t;
 
 extern glwstate_t glw_state;

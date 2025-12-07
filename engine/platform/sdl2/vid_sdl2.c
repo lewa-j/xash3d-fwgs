@@ -427,7 +427,7 @@ void GL_UpdateSwapInterval( void )
 	{
 		ClearBits( gl_vsync.flags, FCVAR_CHANGED );
 
-		if( SDL_GL_SetSwapInterval( gl_vsync.value ) < 0 )
+		if( glw_state.context && SDL_GL_SetSwapInterval( gl_vsync.value ) < 0 )
 			Con_Reportf( S_ERROR  "SDL_GL_SetSwapInterval: %s\n", SDL_GetError( ));
 	}
 }
@@ -483,7 +483,7 @@ void VID_SaveWindowSize( int width, int height, qboolean maximized )
 {
 	int render_w = width, render_h = height;
 
-	if( !glw_state.software )
+	if( glw_state.type != REF_SOFTWARE )
 		SDL_GL_GetDrawableSize( host.hWnd, &render_w, &render_h );
 	else
 		SDL_RenderSetLogicalSize( sw.renderer, width, height );
@@ -693,7 +693,7 @@ qboolean VID_CreateWindow( int width, int height, window_mode_t window_mode )
 
 	if( vid_highdpi.value )
 		SetBits( wndFlags, SDL_WINDOW_ALLOW_HIGHDPI );
-	if( !glw_state.software )
+	if( glw_state.type == REF_GL )
 		SetBits( wndFlags, SDL_WINDOW_OPENGL );
 
 	if( window_mode == WINDOW_MODE_WINDOWED )
@@ -773,7 +773,7 @@ qboolean VID_CreateWindow( int width, int height, window_mode_t window_mode )
 	VID_SetWindowIcon( host.hWnd );
 	SDL_ShowWindow( host.hWnd );
 
-	if( glw_state.software )
+	if( glw_state.type == REF_SOFTWARE )
 	{
 		int sdl_renderer = -2;
 		char cmd[64];
@@ -794,7 +794,7 @@ qboolean VID_CreateWindow( int width, int height, window_mode_t window_mode )
 			}
 		}
 	}
-	else
+	else if( glw_state.type == REF_GL )
 	{
 		while( !GL_CreateContext( ))
 		{
@@ -978,10 +978,10 @@ qboolean R_Init_Video( const int type )
 	WIN_SetDPIAwareness();
 #endif
 
+	glw_state.type = type;
 	switch( type )
 	{
 	case REF_SOFTWARE:
-		glw_state.software = true;
 		break;
 	case REF_GL:
 		if( !glw_state.safe && Sys_GetParmFromCmdLine( "-safegl", safe ) )
@@ -995,6 +995,8 @@ qboolean R_Init_Video( const int type )
 			Con_Reportf( S_ERROR  "Couldn't initialize OpenGL: %s\n", SDL_GetError());
 			return false;
 		}
+		break;
+	case REF_D3D:
 		break;
 	default:
 		Host_Error( "Can't initialize unknown context type %d!\n", type );
