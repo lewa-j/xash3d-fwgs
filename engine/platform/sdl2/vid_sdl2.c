@@ -721,10 +721,8 @@ static qboolean VID_CreateWindow( const int input_width, const int input_height,
 	SetBits( flags, SDL_WINDOW_ALLOW_HIGHDPI );
 #endif // !XASH_WIN32
 
-	if( vid_highdpi.value )
-		SetBits( wndFlags, SDL_WINDOW_ALLOW_HIGHDPI );
 	if( glw_state.type == REF_GL )
-		SetBits( wndFlags, SDL_WINDOW_OPENGL );
+		SetBits( flags, SDL_WINDOW_OPENGL );
 
 	if( position_undefined )
 		rect.x = rect.y = SDL_WINDOWPOS_UNDEFINED;
