@@ -162,11 +162,13 @@ static qboolean DD_CreateBackSurface()
 	return true;
 }
 
+DEFINE_ENGINE_SHARED_CVAR_LIST()
+
 static qboolean R_Init( void )
 {
 	memset(&dxc, 0, sizeof(dxc));
 
-	//RETRIEVE_ENGINE_SHARED_CVAR_LIST();
+	RETRIEVE_ENGINE_SHARED_CVAR_LIST();
 
 	// init draw stack
 	tr.draw_list = &tr.draw_stack[0];
@@ -484,9 +486,9 @@ static int R_GetSpriteTexture( const model_t *m_pSpriteModel, int frame )
 	return 0;
 }
 
-static qboolean Mod_ProcessRenderData( model_t *mod, qboolean create, const byte *buffer )
+static qboolean Mod_ProcessRenderData( model_t *mod, qboolean create, const byte *buffer, size_t buffersize )
 {
-	gEngfuncs.Con_Printf("Mod_ProcessRenderData(%p(%s), %d, %p)\n", mod, mod->name, create, buffer);
+	gEngfuncs.Con_Printf("Mod_ProcessRenderData(%p(%s), %d, %p, %zu)\n", mod, mod->name, create, buffer, buffersize);
 	return true;
 }
 

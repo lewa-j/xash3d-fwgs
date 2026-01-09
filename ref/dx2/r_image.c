@@ -275,43 +275,6 @@ static void GL_ProcessImage(dx_texture_t *tex, rgbdata_t *pic)
 	}
 }
 
-static size_t GL_CalcImageSize(pixformat_t format, int width, int height, int depth)
-{
-	size_t	size = 0;
-
-	// check the depth error
-	depth = Q_max(1, depth);
-
-	switch (format)
-	{
-	case PF_LUMINANCE:
-		size = width * height * depth;
-		break;
-	case PF_RGB_24:
-	case PF_BGR_24:
-		size = width * height * depth * 3;
-		break;
-	case PF_BGRA_32:
-	case PF_RGBA_32:
-		size = width * height * depth * 4;
-		break;
-	case PF_DXT1:
-		size = (((width + 3) >> 2) * ((height + 3) >> 2) * 8) * depth;
-		break;
-	case PF_DXT3:
-	case PF_DXT5:
-	case PF_BC6H_SIGNED:
-	case PF_BC6H_UNSIGNED:
-	case PF_BC7_UNORM:
-	case PF_BC7_SRGB:
-	case PF_ATI2:
-		size = (((width + 3) >> 2) * ((height + 3) >> 2) * 16) * depth;
-		break;
-	}
-
-	return size;
-}
-
 static int GL_CalcMipmapCount(dx_texture_t *tex, qboolean haveBuffer)
 {
 	int	width, height;
@@ -577,7 +540,7 @@ static qboolean GL_UploadTexture(dx_texture_t *tex, rgbdata_t *pic)
 
 			width = Q_max(1, (tex->width >> j));
 			height = Q_max(1, (tex->height >> j));
-			size = GL_CalcImageSize(pic->type, width, height, 1);
+			size = gEngfuncs.Image_CalcImageSize(pic->type, width, height, 1);
 			GL_TextureImageRAW(tex, width, height, pic->type, buf);
 			buf += size; // move pointer
 			tex->numMips++;
@@ -604,7 +567,7 @@ static qboolean GL_UploadTexture(dx_texture_t *tex, rgbdata_t *pic)
 		{
 			width = Q_max(1, (tex->width >> j));
 			height = Q_max(1, (tex->height >> j));
-			size = GL_CalcImageSize(pic->type, width, height, 1);
+			size = gEngfuncs.Image_CalcImageSize(pic->type, width, height, 1);
 			GL_TextureImageRAW(tex, width, height, pic->type, data);
 			//if (mipCount > 1)
 			//	GL_BuildMipMap(data, width, height, tex->depth, tex->flags);
