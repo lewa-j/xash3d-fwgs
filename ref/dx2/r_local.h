@@ -7,7 +7,9 @@
 #include "com_image.h"
 
 #define DIRECTDRAW_VERSION 0x0200
+#define DIRECT3D_VERSION 0x0500//D3DCOLORMODEL bug
 #include <ddraw.h>
+#include <d3d.h>
 
 extern ref_api_t      gEngfuncs;
 
@@ -167,6 +169,10 @@ struct dx_context_s
 	IDirectDrawSurface *pddsBack;
 	IDirectDrawClipper *pddClipper;
 	IDirectDrawClipper *pddBackClipper;
+	IDirect3D *pd3d;
+	IDirect3DDevice *pd3dd;
+	IDirect3DExecuteBuffer *pd3deb;
+	IDirect3DViewport *viewport;
 
 	int renderMode;
 };
@@ -179,7 +185,7 @@ const char *dxResultToStr( HRESULT r );
 #define DXCheck(CALL) {\
 HRESULT r = CALL;\
 if (r != DD_OK)\
-	gEngfuncs.Con_Printf(S_ERROR "%s: DirectX error %X %s\n", __FUNCTION__, r, dxResultToStr(r));\
+	gEngfuncs.Con_Printf(S_ERROR "%s:%d: DirectX error %X(%d 0x%X %d) %s at \"" #CALL "\"\n", __FUNCTION__,__LINE__, r, (r >> 31) & 1, (r >> 16) & 0x7FFF, r & 0xFFFF, dxResultToStr(r));\
 }
 
 void GL_SetRenderMode( int mode );
