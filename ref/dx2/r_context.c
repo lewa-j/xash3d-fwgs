@@ -14,6 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 */
 
+#define INITGUID
 #include "r_local.h"
 #include <string.h>
 #include "xash3d_types.h"
@@ -24,10 +25,12 @@ GNU General Public License for more details.
 #include "com_strings.h"
 #include "ref_params.h"
 
-#define INITGUID
+#if 0
 #define DIRECTDRAW_VERSION 0x0200
+#define DIRECT3D_VERSION 0x0200
 #include <ddraw.h>
 #include <d3d.h>
+#endif
 
 //#pragma comment(lib, "ddraw.lib")
 //TODO COM_GetProcAddress
@@ -81,6 +84,8 @@ const char *dxResultToStr(HRESULT r)
 		return "DDERR_NOEXCLUSIVEMODE";
 	if (r == DDERR_NOFLIPHW)
 		return "DDERR_NOFLIPHW";
+	if (r == DDERR_OUTOFVIDEOMEMORY)
+		return "DDERR_OUTOFVIDEOMEMORY";
 	if (r == DDERR_PRIMARYSURFACEALREADYEXISTS)
 		return "DDERR_PRIMARYSURFACEALREADYEXISTS";
 	if (r == DDERR_UNSUPPORTEDMODE)
@@ -93,6 +98,9 @@ const char *dxResultToStr(HRESULT r)
 		return "D3DERR_VIEWPORTDATANOTSET";
 	if (r == D3DERR_VIEWPORTHASNODEVICE)
 		return "D3DERR_VIEWPORTHASNODEVICE";
+	if (r == D3DERR_SURFACENOTINVIDMEM)
+		return "D3DERR_SURFACENOTINVIDMEM";
+
 	return "UNKNOWN";
 }
 
@@ -128,7 +136,7 @@ static qboolean DD_CreateBackSurface()
 	memset(&ddsd, 0, sizeof(ddsd));
 	ddsd.dwSize = sizeof(ddsd);
 	ddsd.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT;
-	ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_3DDEVICE;
+	ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_3DDEVICE | DDSCAPS_VIDEOMEMORY;
 	ddsd.dwWidth = dxc.windowWidth;
 	ddsd.dwHeight = dxc.windowHeight;
 
@@ -143,7 +151,7 @@ static qboolean DD_CreateBackSurface()
 		return false;
 
 	struct region_t {
-		RGNDATAHEADER   rdh;
+		RGNDATAHEADER rdh;
 		RECT rect;
 	} region;
 	region.rdh.dwSize = sizeof(region.rdh);
@@ -158,6 +166,83 @@ static qboolean DD_CreateBackSurface()
 
 	DXCheck(IDirectDrawClipper_SetClipList(dxc.pddBackClipper, (RGNDATA *)&region, 0));
 	DXCheck(IDirectDrawSurface_SetClipper(dxc.pddsBack, dxc.pddBackClipper));
+
+	return true;
+}
+
+static qboolean D3D_Init()
+{
+	DXCheck(IDirectDraw_QueryInterface(dxc.pdd, &IID_IDirect3D, (void**)&dxc.pd3d));
+	gEngfuncs.Con_Printf("IDirectDraw::QueryInterface(IID_IDirect3D) %p\n", dxc.pd3d);
+
+	if (!dxc.pd3d)
+		return false;
+
+	DXCheck(IDirect3D_CreateViewport(dxc.pd3d, &dxc.viewport, NULL));
+	gEngfuncs.Con_Printf("IDirect3D::CreateViewport %p\n", dxc.viewport);
+
+	if (!dxc.viewport)
+		return false;
+
+	return true;
+}
+
+static qboolean D3D_InitDevice()
+{
+	if (!dxc.pd3d)
+		return false;
+
+	D3DFINDDEVICESEARCH search = { 0 };
+	memset(&search, 0, sizeof(search));
+	search.dwSize = sizeof(search);
+	search.dwFlags = D3DFDS_COLORMODEL;
+	search.dcmColorModel = D3DCOLOR_RGB;
+	D3DFINDDEVICERESULT result = { 0 };
+	memset(&result, 0, sizeof(result));
+	result.dwSize = sizeof(result);
+
+	DXCheck(IDirect3D_FindDevice(dxc.pd3d, &search, &result));
+	DXCheck(IDirectDrawSurface_QueryInterface(dxc.pddsBack, &result.guid, (void**)&dxc.pd3dd));
+	gEngfuncs.Con_Printf("IDirectDrawSurface::QueryInterface(IDirect3DDevice) %p\n", dxc.pd3dd);
+
+	if (!dxc.pd3dd)
+		return false;
+
+	D3DEXECUTEBUFFERDESC ebd = { 0 };
+	memset(&ebd, 0, sizeof(ebd));
+	ebd.dwSize = sizeof(ebd);
+	ebd.dwFlags = D3DDEB_BUFSIZE;
+	ebd.dwBufferSize = 1024 * 64;
+	DXCheck(IDirect3DDevice_CreateExecuteBuffer(dxc.pd3dd, &ebd, &dxc.pd3deb, NULL));
+	gEngfuncs.Con_Printf("IDirect3DDevice::CreateExecuteBuffer %p\n", dxc.pd3deb);
+
+	if (!dxc.pd3deb)
+		return false;
+
+	if (!dxc.viewport)
+		return false;
+
+	DXCheck(IDirect3DDevice_AddViewport(dxc.pd3dd, dxc.viewport));
+
+	DDSURFACEDESC desc = { 0 };
+	memset(&desc, 0, sizeof(desc));
+	desc.dwSize = sizeof(desc);
+	desc.dwFlags = DDSD_WIDTH | DDSD_HEIGHT;
+	DXCheck(IDirectDrawSurface_GetSurfaceDesc(dxc.pddsBack , &desc));
+
+	D3DVIEWPORT viewport = { 0 };
+	viewport.dwSize = sizeof(viewport);
+	viewport.dwX = 0;
+	viewport.dwY = 0;
+	viewport.dwWidth = desc.dwWidth;
+	viewport.dwHeight = desc.dwHeight;
+	viewport.dvScaleX = 1;
+	viewport.dvScaleY = 1;
+	viewport.dvMaxX = 1;
+	viewport.dvMaxY = 1;
+	viewport.dvMinZ = 0;
+	viewport.dvMaxZ = 1;
+	DXCheck(IDirect3DViewport_SetViewport(dxc.viewport, &viewport));
 
 	return true;
 }
@@ -215,6 +300,18 @@ static qboolean R_Init( void )
 	}
 
 	if (!DD_CreateBackSurface())
+	{
+		Mem_FreePool(&r_temppool);
+		return false;
+	}
+
+	if (!D3D_Init())
+	{
+		Mem_FreePool(&r_temppool);
+		return false;
+	}
+
+	if (!D3D_InitDevice())
 	{
 		Mem_FreePool(&r_temppool);
 		return false;
@@ -347,6 +444,47 @@ static void R_DrawStretchRaw( float x, float y, float w, float h, int cols, int 
 	;
 }
 
+static void D3D_SetVert(D3DTLVERTEX* v, float x, float y, float z, float w, float tu, float tv)
+{
+	v->sx = x;
+	v->sy = y;
+	v->sz = z;
+	v->rhw = w;
+	//v->color = RGBA_MAKE(250, 10, 10, 255);
+	v->tu = tu;
+	v->tv = tv;
+}
+
+static void D3D_SetTri(D3DTRIANGLE *t, int v1, int v2, int v3)
+{
+	t->v1 = v1;
+	t->v2 = v2;
+	t->v3 = v3;
+	t->wFlags = D3DTRIFLAG_EDGEENABLETRIANGLE;
+}
+
+static void D3D_PutInstruction(void **dst, BYTE opcode, BYTE size, WORD count)
+{
+	D3DINSTRUCTION* inst = (D3DINSTRUCTION*)*dst;
+	inst->bOpcode = opcode;
+	inst->bSize = size;
+	inst->wCount = count;
+	*dst = (void*)(((D3DINSTRUCTION*)*dst) + 1);
+}
+
+static void D3D_PutProcessVertices(void** dst, DWORD flags, WORD start, WORD count)
+{
+	D3D_PutInstruction(dst, D3DOP_PROCESSVERTICES, sizeof(D3DPROCESSVERTICES), 1);
+
+	D3DPROCESSVERTICES* pv = (D3DPROCESSVERTICES*)*dst;
+	pv->dwFlags = flags;
+	pv->wStart = start;
+	pv->wDest = start;
+	pv->dwCount = count;
+	pv->dwReserved = 0;
+	*dst = (void*)(((D3DPROCESSVERTICES*)*dst) + 1);
+}
+
 static void R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, int texnum )
 {
 	if (texnum <= 0 || texnum >= MAX_TEXTURES)
@@ -356,32 +494,9 @@ static void R_DrawStretchPic( float x, float y, float w, float h, float s1, floa
 	if (!tex->dds)
 		return;
 
+#if 0
 	RECT dstRect = { x, y, x + w, y + h };
 	RECT srcRect = { s1 * tex->width, t1 * tex->height, s2 * tex->width, t2 * tex->height};
-
-#if 0
-	// TODO more
-	if (dstRect.right <= 0 || dstRect.bottom <= 0 || dstRect.bottom > dxc.windowHeight || dstRect.right > dxc.windowWidth)
-		return;
-
-	if (dstRect.left < 0 && dstRect.right > 0)
-	{
-		int width = dstRect.right - dstRect.left;
-		int srcWidth = srcRect.right - srcRect.left;
-
-		srcRect.left += (-dstRect.left / (float)width) * srcWidth;
-		dstRect.left = 0;
-	}
-
-	if (dstRect.top < 0 && dstRect.bottom > 0)
-	{
-		int width = dstRect.bottom - dstRect.top;
-		int srcWidth = srcRect.bottom - srcRect.top;
-
-		srcRect.top += (-dstRect.top / (float)width) * srcWidth;
-		dstRect.top = 0;
-	}
-#endif
 
 	if (dxc.renderMode == kRenderNormal)
 	{
@@ -389,13 +504,74 @@ static void R_DrawStretchPic( float x, float y, float w, float h, float s1, floa
 	}
 	else
 	{
-		DDCOLORKEY          ddck;
+		DDCOLORKEY ddck;
 		ddck.dwColorSpaceLowValue = 0;
 		ddck.dwColorSpaceHighValue = ddck.dwColorSpaceLowValue;
 		DXCheck(IDirectDrawSurface_SetColorKey(tex->dds, DDCKEY_SRCBLT, &ddck));
 
 		DXCheck(IDirectDrawSurface_Blt(dxc.pddsBack, &dstRect, tex->dds, &srcRect, DDBLT_WAIT | DDBLT_KEYSRC, NULL));
 	}
+#else
+
+	if (!dxc.pd3deb)
+		return;
+	{
+		D3DEXECUTEBUFFERDESC ebDesc = { 0 };
+		memset(&ebDesc, 0, sizeof(ebDesc));
+		ebDesc.dwSize = sizeof(ebDesc);
+		ebDesc.dwFlags = D3DDEB_LPDATA;
+		DXCheck(IDirect3DExecuteBuffer_Lock(dxc.pd3deb, &ebDesc));
+
+		void* cur = ebDesc.lpData;
+
+		const int vertCount = 4;
+		//D3DTLVERTEX verts[4]{};
+		//D3DTRIANGLE tris[2]{};
+		D3DTLVERTEX* verts = (D3DTLVERTEX*)cur;
+
+		verts[0].color = RGBA_MAKE(250, 10, 10, 255);
+		D3D_SetVert(verts, x, y, 0.5, 1, s1, t1);
+		verts[1].color = RGBA_MAKE(10, 250, 10, 255);
+		D3D_SetVert(verts + 1, x + w, y, 0.5, 1, s2, t1);
+		verts[2].color = RGBA_MAKE(10, 10, 250, 255);
+		D3D_SetVert(verts + 2, x + w, y + h, 0.5, 1, s2, t2);
+		verts[3].color = RGBA_MAKE(250, 250, 10, 255);
+		D3D_SetVert(verts + 3, x, y + h, 0.5, 1, s1, t2);
+
+		cur = (void*)(((D3DTLVERTEX*)cur) + vertCount);
+
+		void* insStart = cur;
+
+		D3D_PutProcessVertices(&cur, D3DPROCESSVERTICES_COPY | D3DPROCESSVERTICES_UPDATEEXTENTS, 0, vertCount);
+		//align
+		if (!(((ULONG)cur) & 7)) {
+			D3D_PutInstruction(&cur, D3DOP_TRIANGLE, sizeof(D3DTRIANGLE), 0);
+		}
+		D3D_PutInstruction(&cur, D3DOP_TRIANGLE, sizeof(D3DTRIANGLE), 2);
+
+		D3DTRIANGLE* tris = (D3DTRIANGLE*)cur;
+		D3D_SetTri(tris, 0, 1, 2);
+		D3D_SetTri(tris + 1, 0, 2, 3);
+		cur = (void*)(((D3DTRIANGLE*)cur) + 2);
+
+		D3D_PutInstruction(&cur, D3DOP_EXIT, 0, 0);
+
+		DXCheck(IDirect3DExecuteBuffer_Unlock(dxc.pd3deb));
+
+		D3DEXECUTEDATA exData = { 0 };
+		memset(&exData, 0, sizeof(exData));
+		exData.dwSize = sizeof(exData);
+		exData.dwVertexCount = vertCount;
+		exData.dwVertexOffset = 0;
+		exData.dwInstructionOffset = ((char*)insStart - (char*)ebDesc.lpData);
+		exData.dwInstructionLength = ((char*)cur - (char*)insStart);
+		DXCheck(IDirect3DExecuteBuffer_SetExecuteData(dxc.pd3deb , &exData));
+	}
+
+	DXCheck(IDirect3DDevice_BeginScene(dxc.pd3dd));
+	DXCheck(IDirect3DDevice_Execute(dxc.pd3dd, dxc.pd3deb, dxc.viewport, D3DEXECUTE_CLIPPED));
+	DXCheck(IDirect3DDevice_EndScene(dxc.pd3dd));
+#endif
 }
 
 static void FillRGBA( int rendermode, float x, float y, float w, float h, byte r, byte g, byte b, byte a )
@@ -683,14 +859,17 @@ void R_EndFrame(void)
 	if (!dxc.window)
 		return;
 
-	RECT dstRect = {};
-	POINT point = { 0,0 };
-	ClientToScreen(dxc.window, &point);
-	GetClientRect(dxc.window, &dstRect);
-	OffsetRect(&dstRect, point.x, point.y);
+	if (dxc.pddsBack)
+	{
+		RECT dstRect = {};
+		POINT point = { 0,0 };
+		ClientToScreen(dxc.window, &point);
+		GetClientRect(dxc.window, &dstRect);
+		OffsetRect(&dstRect, point.x, point.y);
 
-	RECT srcRect = { 0,0,dxc.windowWidth,dxc.windowHeight };
-	DXCheck(IDirectDrawSurface_Blt(dxc.pddsPrimary, &dstRect, dxc.pddsBack, &srcRect, DDBLT_WAIT, NULL));
+		RECT srcRect = { 0,0,dxc.windowWidth,dxc.windowHeight };
+		DXCheck(IDirectDrawSurface_Blt(dxc.pddsPrimary, &dstRect, dxc.pddsBack, &srcRect, DDBLT_WAIT, NULL));
+	}
 
 	//resize
 	RECT rect = {};
@@ -702,10 +881,25 @@ void R_EndFrame(void)
 	{
 		dxc.windowWidth = w;
 		dxc.windowHeight = h;
-		DXCheck(IDirectDrawSurface_Release(dxc.pddsBack));
-		DXCheck(IDirectDrawClipper_Release(dxc.pddBackClipper));
-		if (!DD_CreateBackSurface())
-			dxc.window = 0;
+
+		if (dxc.pd3deb)
+			IDirect3DExecuteBuffer_Release(dxc.pd3deb);
+		dxc.pd3deb = NULL;
+		if (dxc.pd3dd)
+			IDirect3DDevice_Release(dxc.pd3dd);
+		dxc.pd3dd = NULL;
+		if (dxc.pddsBack)
+			IDirectDrawSurface_Release(dxc.pddsBack);
+		dxc.pddsBack = NULL;
+		if (dxc.pddBackClipper)
+			IDirectDrawClipper_Release(dxc.pddBackClipper);
+		dxc.pddBackClipper = NULL;
+		if (DD_CreateBackSurface())
+		{
+			if (D3D_InitDevice())
+			{
+			}
+		}
 	}
 }
 
