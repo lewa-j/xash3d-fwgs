@@ -277,10 +277,10 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 	if( Sys_CheckParm( "-egl" ))
 		Con_Printf( S_WARN "%s: -egl option is deprecated\n", __func__ );
 
+	glw_state.type = type;
 	switch( type )
 	{
 	case REF_SOFTWARE:
-		glw_state.software = true;
 		break;
 	case REF_GL:
 	{
@@ -297,6 +297,8 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 
 		break;
 	}
+	case REF_D3D:
+		break;
 	default:
 		Host_Error( "Can't initialize unknown context type %d!\n", type );
 		break;
@@ -309,6 +311,7 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 	switch( type )
 	{
 	case REF_SOFTWARE:
+	case REF_D3D:
 		break;
 	case REF_GL:
 		ref.dllFuncs.GL_InitExtensions();

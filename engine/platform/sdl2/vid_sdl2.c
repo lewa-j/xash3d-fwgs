@@ -1048,6 +1048,7 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 		ref.dllFuncs.GL_InitExtensions();
 		break;
 	case REF_SOFTWARE:
+	case REF_D3D:
 	default:
 		break;
 	}

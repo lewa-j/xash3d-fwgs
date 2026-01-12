@@ -384,10 +384,10 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 
 	refState.desktopBitsPixel = 16;
 
+	glw_state.type = type;
 	switch( type )
 	{
 	case REF_SOFTWARE:
-		glw_state.software = true;
 		break;
 	case REF_GL:
 		if( !glw_state.safe && Sys_GetParmFromCmdLine( "-safegl", safe ) )
@@ -401,6 +401,8 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 			Con_Reportf( S_ERROR  "Couldn't initialize OpenGL: %s\n", SDL_GetError());
 			return false;
 		}
+		break;
+	case REF_D3D:
 		break;
 	default:
 		Host_Error( "Can't initialize unknown context type %d!\n", type );
@@ -419,6 +421,7 @@ qboolean R_Init_Video( ref_graphic_apis_t type )
 		ref.dllFuncs.GL_InitExtensions();
 		break;
 	case REF_SOFTWARE:
+	case REF_D3D:
 	default:
 		break;
 	}
