@@ -727,6 +727,9 @@ typedef int (*REFAPI)( int version, ref_interface_t *pFunctionTable, ref_api_t* 
 
 #define RETRIEVE_ENGINE_SHARED_CVAR_LIST() \
 	ENGINE_SHARED_CVAR_LIST( RETRIEVE_ENGINE_SHARED_CVAR )
+
+#else
+#define DECLARE_ENGINE_SHARED_CVAR_LIST() STATIC_ASSERT(false, "Don't use without REF_DLL defined")
 #endif
 
 #endif // REF_API
